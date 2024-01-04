@@ -88,7 +88,7 @@ cd DOBOT_Magician_SimReal/
     ```
 
 ## Others
-+ Thanks to Automation Experiment Center of ZJU for providing instructions and equipments
++ Thanks to Automation Experiment Center,CSE,ZJU for providing instructions and equipments
 + Thanks to Su and Youzi for help
 + if you are interested or my code have bugs, you can contact me at <chengrui0103@foxmail.com>
 + if your INTERESTS is INFRIGEMENTED, DO CONTACT me at <chengrui0103@foxmail.com>
