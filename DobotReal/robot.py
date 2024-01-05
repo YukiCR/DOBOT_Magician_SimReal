@@ -28,7 +28,7 @@
 """
 
 # set USE_CVDECT to False if not using detect part
-USE_CVDECT:bool = True
+USE_CVDECT:bool = False
 # set USE_SERIAL to False if not using serial
 USE_SERIAL:bool = True
 
@@ -36,6 +36,7 @@ USE_SERIAL:bool = True
 import DobotDllType as dType # Dobot DLL for python
 import json # import for saving and reading poses
 from typing import List, Dict, Tuple # for type annotations and type hints
+from enum import Enum, unique # for enum the `Speed` class
 if USE_CVDECT:
     from CVDetect import CVDetector # CV API by Pi
 if USE_SERIAL: # Pyserial for serial communication 
@@ -360,6 +361,89 @@ class manipulator:
                 self.assembleState = [False,False,False]
         dType.dSleep(1000) # sleep 1s
         pass
+
+
+
+@unique
+class Speed(Enum):
+    """
+    a enum of the speed of conveyor \n
+    values should be unique by using @unique 
+    """
+    STOP = 0
+    SLOW = 1
+    MEDIUM = 2
+    FAST = 3
+
+
+
+class conveyor:
+    """
+    the conveyor class
+    """
+    def __init__(self) -> None:
+        self.isOn:bool = False # whether a conveyor is on
+        self.speed = Speed.STOP # current speed of the conveyor
+        pass
+
+
+######################################################################
+# NOTE: hopes you check the states of CMC and send msg to CMC with this class 
+#####################################################################
+class CMC:
+    """
+    a class managing CMC, which will be slave of PC, \n
+    ```
+    """
+    def __init__(self, cvyrNum:int = 3) -> None:
+        """
+        list all available serial ports, \n
+        init serail connection with CMC, \n
+        init a list of conveyors with <cvyrNum> elements \n
+        ```PYTHON
+        # example:
+        c = CMC()
+        # lookfor the first conveyor's state
+        isFirstCvyrOn:bool = c.cvyr[0].isOn
+        FirstCvyrSpeed:Speed = c.cvyr[0].speed
+        FirstCvyrSpeedValue = c.cvyr[0].speed.value
+        # check if Serial is open:
+        isSerialOpen:bool = c.ser.isOpen()
+        # use serial:
+        c.ser.read(3) # read 3 bytes
+        """
+        # list avaliable serial devices
+        ports_list = list(serial.tools.list_ports.comports())
+        if len(ports_list) <= 0:
+            print("no available serial device")
+        else:
+            print("available serial ports:")
+            for comport in ports_list:
+                print(list(comport)[0], list(comport)[1]) 
+        # open serial port, open the port which is "CH340"
+        # let the serial instance be self.ser
+        self.ser = serial.Serial("COM11", 115200, timeout=None)
+        if self.ser.isOpen():                       
+            print("open",ser.name,"successfully")
+        else:
+            raise ValueError("open",ser.name,"failed")
+        # set conveyors:
+        # you can check all conveyors' states
+        self.cvyr:List[conveyor] = [conveyor()] * cvyrNum
+        pass
+        
+    def __del__(self) -> None:
+        if self.ser.isOpen(): 
+            # close the seial if it's open
+            self.ser.close()
+        if not self.ser.isOpen():
+            print("Serial closed sucessfully")
+
+    """TODO: a sets of methods, sending message to CMC with self.ser, changeing the states of self.cvyr""" 
+    def TODO_send(self):
+        # ........
+        pass
+
 
 
 
