@@ -364,6 +364,20 @@ class manipulator:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 @unique
 class Speed(Enum):
     """
@@ -382,9 +396,19 @@ class conveyor:
     the conveyor class
     """
     def __init__(self) -> None:
-        self.isOn:bool = False # whether a conveyor is on
         self.speed = Speed.STOP # current speed of the conveyor
-        pass
+
+    @property
+    def isOn(self) -> bool:
+        """
+        whether a conveyor is on, False if self.speed == Speed.STOP else True
+        """
+        return False if self.speed == Speed.STOP else True
+    
+    @isOn.setter
+    def isOn(self, *args) -> None:
+        raise ValueError("isOn is READ_ONLY, it changes depending on speed")
+
 
 
 ######################################################################
@@ -393,13 +417,13 @@ class conveyor:
 class CMC:
     """
     a class managing CMC, which will be slave of PC, \n
-    ```
     """
     def __init__(self, cvyrNum:int = 3) -> None:
         """
         list all available serial ports, \n
         init serail connection with CMC, \n
         init a list of conveyors with <cvyrNum> elements \n
+        --- 
         ```PYTHON
         # example:
         c = CMC()
@@ -410,7 +434,10 @@ class CMC:
         # check if Serial is open:
         isSerialOpen:bool = c.ser.isOpen()
         # use serial:
-        c.ser.read(3) # read 3 bytes
+        c.readMsg() # read 3 bytes, see if there's object on conveyor
+        ```
+        --- 
+        see also: [testCMCclass.py](DobotReal/testCMCclass.py)
         """
         # list avaliable serial devices
         ports_list = list(serial.tools.list_ports.comports())
@@ -422,28 +449,65 @@ class CMC:
                 print(list(comport)[0], list(comport)[1]) 
         # open serial port, open the port which is "CH340"
         # let the serial instance be self.ser
-        self.ser = serial.Serial("COM11", 115200, timeout=None)
+        self.ser = serial.Serial("COM12", 115200, timeout=5, write_timeout=5)
         if self.ser.isOpen():                       
-            print("open",ser.name,"successfully")
+            print("open",self.ser.name,"successfully")
         else:
-            raise ValueError("open",ser.name,"failed")
+            raise ValueError("open",self.ser.name,"failed")
         # set conveyors:
-        # you can check all conveyors' states
+        # you can check all conveyors' states with this list
         self.cvyr:List[conveyor] = [conveyor()] * cvyrNum
         pass
         
     def __del__(self) -> None:
         if self.ser.isOpen(): 
-            # close the seial if it's open
+            # close the serial if it's open
             self.ser.close()
         if not self.ser.isOpen():
             print("Serial closed sucessfully")
 
-    """TODO: a sets of methods, sending message to CMC with self.ser, changeing the states of self.cvyr""" 
-    def TODO_send(self):
-        # ........
-        pass
-
+    def changeSpeed(self, cvyrIdx:int, goalState:bool):
+        """
+        speed up or down a conveyor \n
+        ---
+        + goalState: True for SpeedUp, False for SpeedDown \n
+        + msg: 2 element bytes; \n
+        msg[0]: the index of the convyor to control \n
+        msg[1]: 1 if goalState == True, 0 if goalState == False        
+        """
+        # msg
+        msg:bytes = bytes( [cvyrIdx, goalState] )
+        self.ser.write(msg)
+        # set state
+        if goalState: # speed up
+            """
+            is return True if two variables 【point to】 the same object (in memory),
+            == return True if the objects referred to by the variables are equal.
+            """
+            if self.cvyr[cvyrIdx].speed == Speed.STOP:
+                self.cvyr[cvyrIdx].speed = Speed.SLOW
+            elif self.cvyr[cvyrIdx].speed == Speed.SLOW:
+                self.cvyr[cvyrIdx].speed = Speed.MEDIUM
+            elif self.cvyr[cvyrIdx].speed == Speed.MEDIUM:
+                self.cvyr[cvyrIdx].speed = Speed.FAST
+        else: # speed down
+            if self.cvyr[cvyrIdx].speed == Speed.SLOW:
+                self.cvyr[cvyrIdx].speed = Speed.STOP
+            elif self.cvyr[cvyrIdx].speed == Speed.MEDIUM:
+                self.cvyr[cvyrIdx].speed = Speed.SLOW
+            elif self.cvyr[cvyrIdx].speed == Speed.FAST:
+                self.cvyr[cvyrIdx].speed = Speed.MEDIUM
+    
+    def readMsg(self, bytes2read:int = 3) -> List[bool]:
+        """
+        read current serial message from CMC, \n
+        automatically clean buffer
+        """
+        # clear all input buffer, only current msg will be received
+        self.ser.reset_input_buffer()
+        com_input = self.ser.read(bytes2read) # read <bytes2read> bytes
+        hasObj:List[bool] = list(x == 1 for x in com_input)
+        return hasObj
 
 
 
@@ -454,20 +518,7 @@ if __name__ == "__main__":
         d = CVDetector()
 
     if USE_SERIAL:
-        # list avaliable serial devices
-        ports_list = list(serial.tools.list_ports.comports())
-        if len(ports_list) <= 0:
-            print("no available serial device")
-        else:
-            print("available serial ports:")
-            for comport in ports_list:
-                print(list(comport)[0], list(comport)[1]) 
-        # open serial port, open the port which is "CH340"
-        ser = serial.Serial("COM11", 115200, timeout=None)
-        if ser.isOpen():                       
-            print("open",ser.name,"successfully")
-        else:
-            raise ValueError("open",ser.name,"failed")        
+        c = CMC()
 
     # r.buffer2pose(r.measure(6)) # measure pose, turn them to self.pose 
     r.poseLoad()
@@ -483,7 +534,7 @@ if __name__ == "__main__":
 
     if USE_CVDECT and USE_SERIAL:
         while True:
-            com_input = ser.read(3)
+            com_input = c.readMsg()
             hasObj:List[bool] = list(x == 1 for x in com_input)
             print("Serial receive:", hasObj)
             # if there's at least one obj accoarding to serial info
@@ -498,8 +549,6 @@ if __name__ == "__main__":
                 r.manage(CamInfo,judgeRes)
                 # would not go home after point2point, need call go home
                 r.goHome()
-                # clear all input buffer, only current msg will be received
-                ser.reset_input_buffer()
             else:
                 pass
             print("assemble state:", r.assembleState)
