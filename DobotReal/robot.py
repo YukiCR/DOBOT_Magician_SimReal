@@ -505,7 +505,7 @@ class CMC:
         """
         # clear all input buffer, only current msg will be received
         self.ser.reset_input_buffer()
-        com_input = self.ser.read(bytes2read) # read <bytes2read> bytes
+        com_input:bytes = self.ser.read(bytes2read) # read <bytes2read> bytes
         hasObj:List[bool] = list(x == 1 for x in com_input)
         return hasObj
 
@@ -534,8 +534,7 @@ if __name__ == "__main__":
 
     if USE_CVDECT and USE_SERIAL:
         while True:
-            com_input = c.readMsg()
-            hasObj:List[bool] = list(x == 1 for x in com_input)
+            hasObj:List[bool] = c.readMsg()
             print("Serial receive:", hasObj)
             # if there's at least one obj accoarding to serial info
             if any(hasObj):
